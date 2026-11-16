@@ -79,6 +79,8 @@ class InitialWindowController: NSWindowController {
     super.showWindow(sender)
   }
 
+  @objc private func browseNAS() { player.nas.showBrowser() }
+
   private func createWindow() {
     let paddingH = CGFloat(30)
 
@@ -155,6 +157,12 @@ class InitialWindowController: NSWindowController {
     mainView.addSubview(actions)
     actions.padding(.top(64), .trailing(paddingH))
 
+    let browse = NSButton(title: NSLocalizedString("Browse NAS", comment: "NAS"), target: self, action: #selector(browseNAS))
+    browse.bezelStyle = .rounded
+    mainView.addSubview(browse)
+    browse.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([browse.topAnchor.constraint(equalTo: actions.bottomAnchor, constant: 6), browse.trailingAnchor.constraint(equalTo: actions.trailingAnchor)])
+
     // resume last file
 
     self.lastFileContainerView = InitialWindowViewActionButton()
@@ -178,7 +186,7 @@ class InitialWindowController: NSWindowController {
     lastFileRow.padding(.horizontal(10), .vertical(6))
 
     mainView.addSubview(lastFileContainerView)
-    lastFileContainerView.spacing(.top(16), to: header).padding(.horizontal(paddingH))
+    lastFileContainerView.spacing(.top(48), to: header).padding(.horizontal(paddingH))
 
     // table
 
@@ -197,7 +205,7 @@ class InitialWindowController: NSWindowController {
     scrollView.documentView = recentFilesTableView
 
     mainView.addSubview(scrollView)
-    self.recentFilesTableTopConstraint = scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 24)
+    self.recentFilesTableTopConstraint = scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 56)
     recentFilesTableTopConstraint.isActive = true
     scrollView.padding(.bottom(24), .horizontal(paddingH - 6))
 
@@ -210,7 +218,7 @@ class InitialWindowController: NSWindowController {
 
     loaded = true
     appIcon.unregisterDraggedTypes()
-    contentView.registerForDraggedTypes([.nsFilenames, .nsURL, .string])
+    contentView.registerForDraggedTypes([.iinaNASMedia, .fileURL, .nsFilenames, .nsURL, .string])
 
     let infoDict = InfoDictionary.shared
     let (version, build) = infoDict.version
@@ -446,6 +454,11 @@ extension InitialWindowController: NSTableViewDelegate, NSTableViewDataSource {
 
 
 class InitialWindowContentView: NSView {
+
+  override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+    player.acceptFromPasteboard(sender)
+  }
+
 
   var player: PlayerCore {
     return (window!.windowController as! InitialWindowController).player

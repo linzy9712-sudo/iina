@@ -74,7 +74,7 @@ class VideoView: NSView {
     wantsExtendedDynamicRangeOpenGLSurface = true
 
     // dragging init
-    registerForDraggedTypes([.nsFilenames, .fileURL, .nsURL, .string])
+    registerForDraggedTypes([.iinaNASMedia, .nsFilenames, .fileURL, .nsURL, .string])
   }
 
   required init?(coder: NSCoder) {
@@ -163,7 +163,7 @@ class VideoView: NSView {
 
   override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
 
-    guard !player.isInMiniPlayer && !playlistShown && hasPlayableFiles else { return super.draggingUpdated(sender) }
+    guard !player.isInMiniPlayer && !playlistShown && hasPlayableFiles else { return player.acceptFromPasteboard(sender) }
 
     func inTriggerArea(_ point: NSPoint?) -> Bool {
       guard let point, let frame = player.mainWindow.window?.frame else { return false }
@@ -182,7 +182,7 @@ class VideoView: NSView {
       lastMousePosition = position
     }
 
-    return super.draggingUpdated(sender)
+    return player.acceptFromPasteboard(sender)
   }
 
   override func draggingExited(_ sender: NSDraggingInfo?) {

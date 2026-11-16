@@ -87,3 +87,20 @@ class MainWindowContentView: NSView {
       owner: controller, userInfo: ["obj": 0]))
   }
 }
+
+/// Receives Finder drops even when the video is covered by the OSC/content views.
+final class PlayerDropHostView: NSView {
+  weak var player: PlayerCore?
+
+  override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+    player?.acceptFromPasteboard(sender) ?? []
+  }
+
+  override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+    draggingEntered(sender)
+  }
+
+  override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    player?.openFromPasteboard(sender) ?? false
+  }
+}

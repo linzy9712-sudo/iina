@@ -39,7 +39,9 @@ final class PlaylistWindowController: NSWindowController, NSWindowDelegate {
   func installVideoHost() {
     guard videoContentView == nil, let parent = player.mainWindow.window,
           let content = parent.contentView else { return }
-    let host = NSView(frame: content.frame)
+    let host = PlayerDropHostView(frame: content.frame)
+    host.player = player
+    host.registerForDraggedTypes([.iinaNASMedia, .fileURL, .nsFilenames, .nsURL, .string])
     parent.contentView = host
     videoContentView = content
     content.translatesAutoresizingMaskIntoConstraints = false
@@ -83,7 +85,9 @@ final class PlaylistWindowController: NSWindowController, NSWindowDelegate {
     panel.menu = menu
     let title = NSTextField(labelWithString: window.title)
     title.font = .systemFont(ofSize: 13, weight: .semibold)
-    let controls = UIHelper.shared.hStack(spacing: 8, title, UIHelper.shared.flexibleSpace(), presentationButton)
+    let nasButton = NSButton(title: NSLocalizedString("Browse NAS", comment: "NAS"), target: self, action: #selector(showNAS))
+    let savedButton = NSButton(title: NSLocalizedString("Saved", comment: "Playlist"), target: self, action: #selector(showSaved))
+    let controls = UIHelper.shared.hStack(spacing: 8, title, UIHelper.shared.flexibleSpace(), nasButton, savedButton, presentationButton)
     panel.addSubview(controls)
     panel.addSubview(pane)
     controls.padding(.horizontal(12))
@@ -107,6 +111,9 @@ final class PlaylistWindowController: NSWindowController, NSWindowDelegate {
     }
     updateControls()
   }
+
+  @objc private func showNAS() { player.nas.showBrowser() }
+  @objc private func showSaved() { player.nas.showLibrary() }
 
   var isVisible: Bool {
     isEmbedded ? player.mainWindow.window?.isVisible == true : window?.isVisible == true

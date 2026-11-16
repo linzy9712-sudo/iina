@@ -183,6 +183,7 @@ class PlayerCore: NSObject {
 
   /// A dispatch queue for auto load feature.
   let backgroundQueue: DispatchQueue
+  lazy var nas = NASPlayerCoordinator(player: self)
   lazy var folderPlaylistImporter = FolderPlaylistImporter(player: self)
   let playlistQueue: DispatchQueue
   let thumbnailQueue: DispatchQueue
@@ -666,6 +667,7 @@ class PlayerCore: NSObject {
     }
 
     mpv.mpvInit()
+    nas.install()
     events.emit(.mpvInitialized)
 
     let audioDevice = Preference.string(for: .audioDevice)!
@@ -714,6 +716,8 @@ class PlayerCore: NSObject {
   ///     task is still running this method only changes the player state. When the background task ends it will notice that shutting
   ///     down was in progress and will call this method again to continue the process of shutting down..
   func shutdown() {
+    nas.invalidate()
+    nas.finish()
     info.state = .shuttingDown
     guard !backgroundTaskInUse else { return }
     log("Shutting down")
@@ -955,6 +959,9 @@ class PlayerCore: NSObject {
   ///     running when the mpv core is shutdown it may call into mpv triggering a crash.
   func stop() {
     guard info.state != .shutDown else { return }
+    folderPlaylistImporter.cancel()
+    nas.invalidate()
+    nas.finish()
     savePlaybackPosition()
 
     // The player may already be stopped in which case the state must not be set to stopping.
@@ -1524,24 +1531,18 @@ class PlayerCore: NSObject {
   }
 
   func playlistReorder(newPlaylist: [MPVPlaylistItem]) {
-    guard Set(info.playlist) == Set(newPlaylist) else { return }
-    if info.playlist == newPlaylist { return }
+    let wanted = newPlaylist.map(\.playlistID)
+    guard let snapshot = mpv.getNode(MPVProperty.playlist) as? [[String: Any]] else { return }
+    var current = snapshot.map { MPVController.nodeValueAsInt($0["id"]) }
+    guard current.count == wanted.count, Set(current) == Set(wanted) else { return }
+    guard current != wanted else { return }
     info.isShuffled = false
-    mpv.command(.playlistClear)
-    guard let currentPlaying = newPlaylist.firstIndex(where: { $0.isPlaying } ) else {
-      for item in newPlaylist {
-        mpv.playlistAppend(item.filename)
-      }
-      return
+    // Moving preserves mpv entry IDs and the active decoder/session, including a pending NAS load.
+    for (destination, id) in wanted.enumerated() {
+      guard let source = current.firstIndex(of: id), source != destination else { continue }
+      mpv.playlistMove(source, to: destination)
+      current.insert(current.remove(at: source), at: destination)
     }
-
-    for i in (0..<currentPlaying).reversed() {
-      mpv.playlistInsert(newPlaylist[i].filename, index: 0)
-    }
-    for i in currentPlaying + 1..<newPlaylist.count {
-      mpv.playlistAppend(newPlaylist[i].filename)
-    }
-
     postNotification(.iinaPlaylistChanged)
   }
 
@@ -1561,12 +1562,14 @@ class PlayerCore: NSObject {
   }
 
   func playlistRemove(_ index: Int) {
+    if index == mpv.getInt(MPVProperty.playlistPos) { nas.invalidate() }
     mpv.playlistRemove(index)
     info.isShuffled = false
     postNotification(.iinaPlaylistChanged)
   }
 
   func playlistRemove(_ indexSet: IndexSet) {
+    if indexSet.contains(mpv.getInt(MPVProperty.playlistPos)) { nas.invalidate() }
     guard !indexSet.isEmpty else { return }
     var count = 0
     for i in indexSet {
@@ -1603,6 +1606,7 @@ class PlayerCore: NSObject {
   ///     clicking in the playlist on the entry that is currently playing reloads that entry.
   /// - Parameter pos: Position of the entry in the playlist to be played.
   func playFileInPlaylist(_ pos: Int) {
+    nas.invalidate()
     mainWindow.videoView.displayActive()
     if !mpv.getFlag(MPVOption.PlaybackControl.pause) {
       log("Pausing playback before playing entry at index \(pos) in the playlist")
@@ -1627,6 +1631,7 @@ class PlayerCore: NSObject {
   ///     resumes playback.
   /// - Parameter nextMedia: When `true` play the next entry in the playlist; otherwise play the previous entry.
   func navigateInPlaylist(nextMedia: Bool) {
+    nas.invalidate()
     guard !mainWindow.interactiveMode.isActive else { return }
 
     if nextMedia == false && (info.playlist.first?.isPlaying) ?? false {
@@ -2199,6 +2204,7 @@ class PlayerCore: NSObject {
       info.setCachedVideoDuration(filename, duration)
     }
     info.videoPosition = VideoTime(pos)
+    nas.loaded()
     info.videoRemaining = VideoTime(remaining)
     triedUsingExactSeekForCurrentFile = false
     checkUnsyncedWindowOptions()
@@ -2267,6 +2273,7 @@ class PlayerCore: NSObject {
   }
 
   func fileEnded(_ dueToStopCommand: Bool) {
+    nas.finish()
     // if receive end-file when loading file, might be error
     // wait for idle
     if info.state == .loading || info.state == .starting {
@@ -2411,6 +2418,7 @@ class PlayerCore: NSObject {
       // position must be updated before notifying the manager.
       syncUITime()
       info.state = paused ? .paused : .playing
+      nas.progress()
       refreshSyncUITimer()
       // Follow energy efficiency best practices and ensure IINA is absolutely idle when the video
       // is paused to avoid wasting energy with needless processing. If paused shutdown the timer
@@ -3011,18 +3019,17 @@ class PlayerCore: NSObject {
   }
 
   func getPlaylist() {
-    info.$playlist.withLock { playlist in
-      playlist.removeAll()
-      let playlistCount = mpv.getInt(MPVProperty.playlistCount)
-      for index in 0..<playlistCount {
-        let playlistItem = MPVPlaylistItem(filename: mpv.getString(MPVProperty.playlistNFilename(index))!,
-                                           isCurrent: mpv.getFlag(MPVProperty.playlistNCurrent(index)),
-                                           isPlaying: mpv.getFlag(MPVProperty.playlistNPlaying(index)),
-                                           title: mpv.getString(MPVProperty.playlistNTitle(index)))
-        playlistItem.playlistID = mpv.getInt("playlist/\(index)/id")
-        playlist.append(playlistItem)
-      }
+    // One native snapshot prevents count/index races during automatic advancement or plugin edits.
+    guard let snapshot = mpv.getNode(MPVProperty.playlist) as? [[String: Any]] else { return }
+    let playlist = snapshot.compactMap { value -> MPVPlaylistItem? in
+      guard let filename = value["filename"] as? String else { return nil }
+      let item = MPVPlaylistItem(filename: filename, isCurrent: value["current"] as? Bool ?? false,
+                                isPlaying: value["playing"] as? Bool ?? false,
+                                title: NASQueueEntry.decode(filename)?.title ?? value["title"] as? String)
+      item.playlistID = MPVController.nodeValueAsInt(value["id"])
+      return item
     }
+    info.playlist = playlist
   }
 
   func getChapters() {

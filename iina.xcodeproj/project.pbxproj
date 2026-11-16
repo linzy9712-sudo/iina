@@ -365,6 +365,16 @@
 		E3FF5AC02938582F0019CE45 /* JavascriptDevTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3FF5ABF2938582F0019CE45 /* JavascriptDevTool.swift */; };
 		C0DE00000000000000000001 /* PlaylistWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000002 /* PlaylistWindowController.swift */; };
 		C0DE00000000000000000003 /* FolderPlaylistImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000004 /* FolderPlaylistImporter.swift */; };
+		C0DE02000000000000000002 /* NASModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE02000000000000000001 /* NASModels.swift */; };
+		C0DE02000000000000000102 /* JellyfinCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE02000000000000000101 /* JellyfinCredentialStore.swift */; };
+		C0DE02000000000000000202 /* JellyfinClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE02000000000000000201 /* JellyfinClient.swift */; };
+		C0DE02000000000000000302 /* SettingsPageNAS.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE02000000000000000301 /* SettingsPageNAS.swift */; };
+		C0DE03000000000000000002 /* NASQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE03000000000000000001 /* NASQueue.swift */; };
+		C0DE03000000000000000102 /* JellyfinPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE03000000000000000101 /* JellyfinPlayback.swift */; };
+		C0DE03000000000000000202 /* NASPlayerCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE03000000000000000201 /* NASPlayerCoordinator.swift */; };
+		C0DE03000000000000000302 /* NASBrowserWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE03000000000000000301 /* NASBrowserWindowController.swift */; };
+		C0DE03000000000000000402 /* NASPlaylistWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE03000000000000000401 /* NASPlaylistWindowController.swift */; };
+		C0DE03000000000000000502 /* NASImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE03000000000000000501 /* NASImportService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1367,6 +1377,16 @@
 		FB011A0721F8C04200477551 /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = hi; path = hi.lproj/KeyBinding.strings; sourceTree = "<group>"; };
 		C0DE00000000000000000002 /* PlaylistWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistWindowController.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000004 /* FolderPlaylistImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderPlaylistImporter.swift; sourceTree = "<group>"; };
+		C0DE02000000000000000001 /* NASModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/NASModels.swift; sourceTree = "<group>"; };
+		C0DE02000000000000000101 /* JellyfinCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/JellyfinCredentialStore.swift; sourceTree = "<group>"; };
+		C0DE02000000000000000201 /* JellyfinClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/JellyfinClient.swift; sourceTree = "<group>"; };
+		C0DE02000000000000000301 /* SettingsPageNAS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/SettingsPageNAS.swift; sourceTree = "<group>"; };
+		C0DE03000000000000000001 /* NASQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/NASQueue.swift; sourceTree = "<group>"; };
+		C0DE03000000000000000101 /* JellyfinPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/JellyfinPlayback.swift; sourceTree = "<group>"; };
+		C0DE03000000000000000201 /* NASPlayerCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/NASPlayerCoordinator.swift; sourceTree = "<group>"; };
+		C0DE03000000000000000301 /* NASBrowserWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/NASBrowserWindowController.swift; sourceTree = "<group>"; };
+		C0DE03000000000000000401 /* NASPlaylistWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/NASPlaylistWindowController.swift; sourceTree = "<group>"; };
+		C0DE03000000000000000501 /* NASImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NAS/NASImportService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2073,6 +2093,16 @@
 				E318D9082FE096960025DBC5 /* SidebarSubtitlesPane.swift */,
 				E318D90E2FE5C8500025DBC5 /* SidebarPlaylistPane.swift */,
 				C0DE00000000000000000002 /* PlaylistWindowController.swift */,
+				C0DE02000000000000000001 /* NASModels.swift */,
+				C0DE02000000000000000101 /* JellyfinCredentialStore.swift */,
+				C0DE02000000000000000201 /* JellyfinClient.swift */,
+				C0DE02000000000000000301 /* SettingsPageNAS.swift */,
+				C0DE03000000000000000001 /* NASQueue.swift */,
+				C0DE03000000000000000101 /* JellyfinPlayback.swift */,
+				C0DE03000000000000000201 /* NASPlayerCoordinator.swift */,
+				C0DE03000000000000000301 /* NASBrowserWindowController.swift */,
+				C0DE03000000000000000401 /* NASPlaylistWindowController.swift */,
+				C0DE03000000000000000501 /* NASImportService.swift */,
 				C0DE00000000000000000004 /* FolderPlaylistImporter.swift */,
 				E318D9102FE5E2670025DBC5 /* SidebarChaptersPane.swift */,
 				8466BE161D5CDD0300039D03 /* QuickSettingViewController.swift */,
@@ -2533,6 +2563,16 @@
 				3415BC8A2FC82FD9003B3FBD /* TimePreviewView.swift in Sources */,
 				E318D90F2FE5C8690025DBC5 /* SidebarPlaylistPane.swift in Sources */,
 				C0DE00000000000000000001 /* PlaylistWindowController.swift in Sources */,
+				C0DE02000000000000000002 /* NASModels.swift in Sources */,
+				C0DE02000000000000000102 /* JellyfinCredentialStore.swift in Sources */,
+				C0DE02000000000000000202 /* JellyfinClient.swift in Sources */,
+				C0DE02000000000000000302 /* SettingsPageNAS.swift in Sources */,
+				C0DE03000000000000000002 /* NASQueue.swift in Sources */,
+				C0DE03000000000000000102 /* JellyfinPlayback.swift in Sources */,
+				C0DE03000000000000000202 /* NASPlayerCoordinator.swift in Sources */,
+				C0DE03000000000000000302 /* NASBrowserWindowController.swift in Sources */,
+				C0DE03000000000000000402 /* NASPlaylistWindowController.swift in Sources */,
+				C0DE03000000000000000502 /* NASImportService.swift in Sources */,
 				C0DE00000000000000000003 /* FolderPlaylistImporter.swift in Sources */,
 				8487BEC31D76A1AF00FD17B0 /* MenuController.swift in Sources */,
 				8450403D1E0A9EE20079C194 /* InspectorWindowController.swift in Sources */,

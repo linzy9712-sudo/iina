@@ -37,6 +37,7 @@ class SettingsWindow: CommonWindow {
     SettingsPageAudio(),
     SettingsPageSubtitles(),
     SettingsPageNetwork(),
+    SettingsPageNAS(),
     SettingsPageControl(),
     SettingsPageKeyBindings(),
     SettingsPageAdvanced(),

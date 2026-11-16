@@ -141,7 +141,7 @@ class SidebarPlaylistPane: NSView, SidebarPane {
     tableView.menu!.delegate = self
     tableView.target = self
     tableView.doubleAction = #selector(doubleAction)
-    tableView.registerForDraggedTypes([.iinaPlaylistItem, .nsFilenames, .nsURL, .string])
+    tableView.registerForDraggedTypes([.iinaPlaylistItem, .iinaNASMedia, .fileURL, .nsFilenames, .nsURL, .string])
     tableView.headerView = nil
     tableView.backgroundColor = standalone ? .clear : .sidebarTableBackground
     tableView.gridStyleMask = standalone ? [] : [.solidHorizontalGridLineMask]
@@ -528,6 +528,7 @@ extension SidebarPlaylistPane: NSTableViewDelegate, NSTableViewDataSource {
 
   @discardableResult
   func pasteFromPasteboard(row: Int, from pboard: NSPasteboard) -> Bool {
+    if let entries = NASDrop.entries(pboard) { player.nas.append(entries); return true }
     if let urls = player.folderDropURLs(from: pboard) {
       player.folderPlaylistImporter.enqueue(urls)
       return true

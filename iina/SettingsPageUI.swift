@@ -329,6 +329,11 @@ fileprivate class GeometryBindings: NSObject {
       geometry += windowPosYOffset.stringValue
       geometry += windowPosYUnit.selectedTag() == UnitPointTag ? "" : "%"
     }
+    guard GeometryDef.isValidPreference(geometry) else {
+      Utility.showAlert("window_geometry.invalid", style: .warning)
+      updateControls()
+      return
+    }
     Preference.set(geometry, for: .initialWindowSizePosition)
   }
 

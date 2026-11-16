@@ -12,7 +12,7 @@ extension PlayerCore {
 
   /// Only inspect top-level metadata here. Recursive validation happens after accepting the drop.
   func folderDropURLs(from pasteboard: NSPasteboard) -> [URL]? {
-    guard info.state.active else { return nil }
+    guard info.state.active || info.state == .idle else { return nil }
     let urls: [URL]
     if let paths = pasteboard.propertyList(forType: .nsFilenames) as? [String] {
       urls = paths.map { URL(fileURLWithPath: $0) }
@@ -20,7 +20,11 @@ extension PlayerCore {
       urls = (pasteboard.readObjects(forClasses: [NSURL.self],
                                     options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
     }
-    return urls.contains { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true } ? urls : nil
+    if urls.contains(where: { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }) { return urls }
+    // A mapped single file must use the same identity/import pipeline as a folder.
+    if let configuration = try? NASPlayerCoordinator.store.load(),
+       urls.contains(where: { url in configuration.mappings.contains { (try? NASPathMapper.map(url.path, rules: [$0])) != nil } }) { return urls }
+    return nil
   }
 
 
@@ -150,6 +154,7 @@ extension PlayerCore {
     // get info
     let pb = sender.draggingPasteboard
     guard let types = pb.types else { return [] }
+    if NASDrop.entries(pb) != nil { return .copy }
     if folderDropURLs(from: pb) != nil { return .copy }
 
     if types.contains(.nsFilenames) {
@@ -197,7 +202,8 @@ extension PlayerCore {
     // get info
     let pb = sender.draggingPasteboard
     guard let types = pb.types else { return false }
-    if !useGlobalOpenRouting, let urls = folderDropURLs(from: pb) {
+    if let entries = NASDrop.entries(pb) { nas.append(entries); return true }
+    if let urls = folderDropURLs(from: pb) {
       folderPlaylistImporter.enqueue(urls)
       return true
     }
