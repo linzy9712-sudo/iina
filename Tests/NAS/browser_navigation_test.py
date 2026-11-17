@@ -9,7 +9,7 @@ def method(name):
   if s[i]=='}':level-=1
   i+=1
  return s[start:i].replace('private func','func')
-methods=['  private func rememberLocation()', '  private func restore(', '  @objc private func goBack()', '  @objc private func goForward()', '  @objc private func jumpToFolder(', '  private func navigate(', '  private func renderColumns()']
+methods=['  private func rememberLocation()', '  private func restore(', '  @objc private func goBack()', '  @objc private func goForward()', '  @objc private func jumpToFolder(', '  private func navigate(', '  private func renderColumns()', '  private func selectedRowsForAppend()', '  private func data(for']
 scroll_type = s[s.index('final class NASColumnsScrollView:'):s.index('final class NASBrowserWindowController:')]
 code='import Cocoa\n' + scroll_type + '''
 final class Probe: NSObject, NSTableViewDelegate, NSTableViewDataSource {
@@ -51,6 +51,17 @@ p.columnsScroll.setFrameSize(NSSize(width:700,height:300))
 p.renderColumns()
 precondition(p.columnRows.count==3 && p.columnsStack.arrangedSubviews.count==3)
 precondition(p.columnRows[0][0].folder=="a" && p.columnRows[1][0].folder=="c" && p.columnRows[2][0].title=="movie")
+var queuedFolders=p.selectedRowsForAppend().compactMap(\.folder)
+precondition(queuedFolders == ["c"])
+p.cachedRows["c"]=[.init(title:"D",folder:"d")]
+p.navigate(to:.init(title:"D",folder:"d"));p.rows=[];p.renderColumns()
+queuedFolders += p.selectedRowsForAppend().compactMap(\.folder)
+precondition(queuedFolders == ["c","d"])
+p.rows=[.init(title:"new movie",folder:nil)];p.renderColumns()
+precondition(p.selectedRowsForAppend().compactMap(\.folder)==["d"])
+p.goBack();p.rows=[.init(title:"movie",folder:nil)];p.renderColumns()
+print("PASS: adding one folder then entering another retains the new append selection across loading and rendering")
+
 for style in [NSScroller.Style.legacy, .overlay] {
  p.columnsScroll.scrollerStyle=style
  for height in [200.0,300.0,500.0] {

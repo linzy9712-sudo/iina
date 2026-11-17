@@ -118,7 +118,11 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
       scroll.heightAnchor.constraint(equalTo: columnsStack.heightAnchor).isActive = true
       if depth < parents.count {
         let next = depth + 1 < parents.count ? parents[depth + 1] : folder
-        if let index = values.firstIndex(where: { $0.folder == next }) { list.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false) }
+        if let index = values.firstIndex(where: { $0.folder == next }) {
+          list.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+          // Navigation rebuilds every table. Keep the deepest selected folder as the append source.
+          if depth == parents.count - 1 { selectedTable = list }
+        }
       }
     }
     columnsStack.setFrameSize(NSSize(width: CGFloat(locations.count) * 260, height: columnsScroll.contentSize.height))
@@ -201,6 +205,8 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
   private var folder: String?
   private var task: Task<Void, Never>?
   private var ticket = UUID()
+  private var importTask: Task<Void, Never>?
+  private var importTicket = UUID()
 
   init(player: PlayerCore) {
     self.player = player
@@ -224,7 +230,7 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
     viewStyle.selectedSegment = UserDefaults.standard.object(forKey: "nasBrowserViewStyle") == nil ? 1 : min(1, max(0, UserDefaults.standard.integer(forKey: "nasBrowserViewStyle")))
     viewStyle.target = self; viewStyle.action = #selector(changeView)
     let top = NSStackView(views: [backButton, forwardButton, servers, mode, button("Up", #selector(up)), button("Refresh", #selector(refresh))])
-    let viewBar = NSStackView(views: [viewStyle])
+    let viewBar = NSStackView(views: [viewStyle, button("Append current folder", #selector(appendCurrentFolder))])
     mode.addItems(withTitles: ["Jellyfin libraries", "Indexed physical folders"].map { NSLocalizedString($0, comment: "NAS") })
     mode.target = self; mode.action = #selector(resetFolder)
     servers.target = self; servers.action = #selector(resetFolder)
@@ -276,7 +282,7 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
     super.showWindow(sender)
     window?.makeKeyAndOrderFront(sender)
   }
-  func windowWillClose(_ notification: Notification) { task?.cancel(); ticket = UUID() }
+  func windowWillClose(_ notification: Notification) { task?.cancel(); ticket = UUID(); cancelImport() }
   private func button(_ title: String, _ action: Selector) -> NSButton { NSButton(title: NSLocalizedString(title, comment: "NAS"), target: self, action: action) }
   func numberOfRows(in tableView: NSTableView) -> Int { data(for: tableView).count }
   func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -296,7 +302,8 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
     guard rows.indices.contains(row), let entry = rows[row].entry, let data = try? JSONEncoder().encode([entry]) else { return nil }
     let item = NSPasteboardItem(); item.setData(data, forType: .iinaNASMedia); return item
   }
-  @objc private func cancel() { player.folderPlaylistImporter.cancel(); task?.cancel(); ticket = UUID(); status.stringValue = "Cancelled" }
+  private func cancelImport() { importTask?.cancel(); importTask = nil; importTicket = UUID() }
+  @objc private func cancel() { player.folderPlaylistImporter.cancel(); task?.cancel(); ticket = UUID(); cancelImport(); status.stringValue = "Cancelled" }
   @objc private func tracks() { player.nas.showTracks() }
   @objc private func saved() { player.nas.showLibrary() }
   @objc private func importResults() {
@@ -305,7 +312,7 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
     if alert.informativeText.isEmpty { alert.informativeText = "No import errors." }
     if let window { alert.beginSheetModal(for: window) }
   }
-  @objc private func resetFolder() { cachedRows.removeAll(); backHistory.removeAll(); forwardHistory.removeAll(); folder = nil; parents = []; folderNames = []; search.stringValue = ""; refresh() }
+  @objc private func resetFolder() { cancelImport(); cachedRows.removeAll(); backHistory.removeAll(); forwardHistory.removeAll(); folder = nil; parents = []; folderNames = []; search.stringValue = ""; refresh() }
   @objc private func up() { guard !parents.isEmpty else { return }; rememberLocation(); folder = parents.removeLast(); folderNames.removeLast(); search.stringValue = ""; refresh() }
   @objc private func refresh() {
     updateBreadcrumbs()
@@ -371,16 +378,36 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
     if row.folder != nil { navigate(to: row) }
     else if let entry = row.entry { player.nas.append([entry], play: true) }
   }
-  @objc private func appendSelection() {
-    guard let server else { return }
-    let source = columnsVisible ? (selectedTable ?? table) : table
+  private func selectedRowsForAppend() -> [Row] {
+    guard let source = columnsVisible ? selectedTable : table else { return [] }
     let values = data(for: source)
-    var selected = source.selectedRowIndexes.compactMap { values.indices.contains($0) ? values[$0] : nil }
-    if selected.isEmpty, values.indices.contains(source.clickedRow) { selected = [values[source.clickedRow]] }
+    return source.selectedRowIndexes.compactMap { values.indices.contains($0) ? values[$0] : nil }
+  }
+  @objc private func appendSelection() {
+    appendRows(selectedRowsForAppend())
+  }
+  @objc private func appendCurrentFolder() {
+    guard let folder else {
+      status.stringValue = NSLocalizedString("Open a folder first.", comment: "NAS")
+      return
+    }
+    appendRows([Row(title: folderNames.last ?? folder, folder: folder)])
+  }
+  private func appendRows(_ selected: [Row]) {
+    guard let server else { return }
+    guard !selected.isEmpty else {
+      status.stringValue = NSLocalizedString("Select videos or a folder to add.", comment: "NAS")
+      return
+    }
+    guard importTask == nil else {
+      status.stringValue = NSLocalizedString("Adding videos… Please wait or cancel the current import.", comment: "NAS")
+      return
+    }
     let physical = mode.indexOfSelectedItem == 1
-    task?.cancel(); ticket = UUID(); let stamp = ticket
+    importTicket = UUID(); let stamp = importTicket
     status.stringValue = "Collecting selected folders…"
-    task = Task { @MainActor in
+    importTask = Task { @MainActor in
+      defer { if importTicket == stamp { importTask = nil } }
       do {
         var entries: [NASQueueEntry] = []
         for row in selected {
@@ -392,13 +419,13 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
               entries += index.media.filter { $0.path.hasPrefix(folder + "/") }.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }.map { .remote($0, server: server) }
             } else {
               let items = try await fetch(server: server, parent: folder, recursive: true)
-              entries += items.map { NASQueueEntry(title: $0.Name ?? $0.Id, server: server.id, serverID: server.serverID, itemID: $0.Id) }
+              entries += items.filter { $0.IsFolder != true }.map { NASQueueEntry(title: $0.Name ?? $0.Id, server: server.id, serverID: server.serverID, itemID: $0.Id) }
             }
           }
         }
-        guard ticket == stamp, !Task.isCancelled else { return }
+        guard importTicket == stamp, !Task.isCancelled else { return }
         player.nas.append(entries); status.stringValue = "Processed \(entries.count) videos."
-      } catch { if ticket == stamp { status.stringValue = error.localizedDescription } }
+      } catch { if importTicket == stamp { status.stringValue = error.localizedDescription } }
     }
   }
 }

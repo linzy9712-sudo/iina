@@ -1195,3 +1195,11 @@
 "List view" = "List view";
 
 "Column view" = "Column view";
+
+"Append current folder" = "Append current folder";
+
+"Open a folder first." = "Open a folder first.";
+
+"Select videos or a folder to add." = "Select videos or a folder to add.";
+
+"Adding videos… Please wait or cancel the current import." = "Adding videos… Please wait or cancel the current import.";
