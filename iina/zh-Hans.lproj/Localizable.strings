@@ -1077,3 +1077,65 @@
 "settings.$toThe" = "距离屏幕";
 "settings.$top" = "顶";
 "settings.$ytdlWarning" = "“在线媒体”插件还具备切换画质和下载视频等附加功能。如果该插件已安装并启用，IINA 将使用该插件。以下设置仅在该插件不可用时才生效。";
+
+"Browse NAS" = "浏览 NAS";
+
+"Up" = "上一级";
+
+"Refresh" = "刷新";
+
+"Append selected" = "添加所选";
+
+"Saved playlists" = "保存的播放列表";
+
+"Audio / Subtitles" = "音轨 / 字幕";
+
+"Import results" = "导入结果";
+
+"Cancel" = "取消";
+
+"Jellyfin libraries" = "Jellyfin 媒体库";
+
+"Indexed physical folders" = "文件夹浏览";
+
+"Search videos" = "搜索视频";
+
+"Folder / Video" = "文件夹 / 视频";
+
+"All folders" = "全部文件夹";
+
+"Loading…" = "正在加载…";
+
+"%d items" = "%d 个项目";
+
+" · Cached index" = " · 本地索引";
+
+"Save current" = "保存当前列表";
+
+"Rename" = "重命名";
+
+"Copy" = "复制";
+
+"Merge" = "合并";
+
+"Delete" = "删除";
+
+"Append selected videos" = "添加所选视频";
+
+"Parent folders" = "上级文件夹";
+
+"Back" = "后退";
+
+"Forward" = "前进";
+
+"List view" = "列表";
+
+"Column view" = "分栏";
+
+"Append current folder" = "添加当前文件夹";
+
+"Open a folder first." = "请先进入一个文件夹。";
+
+"Select videos or a folder to add." = "请选择要添加的视频或文件夹。";
+
+"Adding videos… Please wait or cancel the current import." = "正在添加视频，请等待或取消当前导入。";

@@ -188,7 +188,10 @@ class Titlebar: NSView {
       titleLeadingConstraint.priority = .defaultHigh
       titleLeadingConstraint.isActive = true
 
-      let accessoryView = NSStackView(views: [removeBlackBarButton, onTopButton])
+      let browse = NSButton(title: NSLocalizedString("Browse NAS", comment: "NAS"), target: self, action: #selector(browseNAS))
+      browse.bezelStyle = .rounded
+      browse.controlSize = .small
+      let accessoryView = NSStackView(views: [browse, removeBlackBarButton, onTopButton])
       accessoryView.translatesAutoresizingMaskIntoConstraints = false
       accessoryView.orientation = .horizontal
       accessoryView.spacing = 8
@@ -215,6 +218,8 @@ class Titlebar: NSView {
     updateShadow()
   }
   
+  @objc private func browseNAS() { mainWindow.player.nas.showBrowser() }
+
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }

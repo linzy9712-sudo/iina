@@ -1075,3 +1075,131 @@
 "settings.$toThe" = "to the";
 "settings.$top" = "top";
 "settings.$ytdlWarning" = "The Online Media plugin has additional features such as switching quality and video downloading. IINA will use the plugin if it's installed and enabled. The settings below only work if the plugin is not available.";
+
+"playlist.window_title" = "Playlist";
+"playlist.search" = "Search playlist";
+
+
+"playlist.embed_no_space" = "Move the player left or use Free window mode to keep the video area unchanged.";
+
+"playlist.detach" = "Detach Playlist";
+"playlist.attach" = "Attach Playlist to Player";
+
+"settings.lockPlayerWindowSize.label" = "Lock player window size";
+"settings.lockPlayerWindowSize.desc" = "Keep the window size and position when switching videos. You can still resize the window manually. Turn off to use automatic video sizing.";
+
+/* NAS / Jellyfin settings */
+"Add server" = "Add server";
+"Authentication expired or access denied. Sign in again." = "Authentication expired or access denied. Sign in again.";
+"Cancel operation" = "Cancel operation";
+"Cannot reach Jellyfin. Check the address, network and certificate." = "Cannot reach Jellyfin. Check the address, network and certificate.";
+"Case-sensitive paths" = "Case-sensitive paths";
+"Connected. Server and account verified." = "Connected. Server and account verified.";
+"Delete mapping" = "Delete mapping";
+"Delete server" = "Delete server";
+"Enter an HTTP or HTTPS server address without credentials, query or fragment." = "Enter an HTTP or HTTPS server address without credentials, query or fragment.";
+"Index refresh is a complete scan. It preserves the previous index if interrupted. Unmatched paths require a refresh before retrying." = "Index refresh is a complete scan. It preserves the previous index if interrupted. Unmatched paths require a refresh before retrying.";
+"Index saved: %d media paths; %d videos without paths." = "Index saved: %d media paths; %d videos without paths.";
+"Indexed %d of %d videos…" = "Indexed %d of %d videos…";
+"Jellyfin directory (absolute POSIX path)" = "Jellyfin directory (absolute POSIX path)";
+"Jellyfin returned HTTP %d." = "Jellyfin returned HTTP %d.";
+"Jellyfin returned an invalid or incomplete response." = "Jellyfin returned an invalid or incomplete response.";
+"Jellyfin returned videos without readable paths. Check account permissions and server support." = "Jellyfin returned videos without readable paths. Check account permissions and server support.";
+"Jellyfin servers" = "Jellyfin servers";
+"Keychain operation failed (%d)." = "Keychain operation failed (%d).";
+"Local mount directory" = "Local mount directory";
+"Mapping saved." = "Mapping saved.";
+"Matched:" = "Matched:";
+"Multiple mappings have equal priority. Edit their priority or roots." = "Multiple mappings have equal priority. Edit their priority or roots.";
+"Multiple media items match this path. No item was selected." = "Multiple media items match this path. No item was selected.";
+"New mapping" = "New mapping";
+"New server" = "New server";
+"No index exists for this server address and account. Refresh the index." = "No index exists for this server address and account. Refresh the index.";
+"No indexed media matches this path. Refresh the index and check the mapping." = "No indexed media matches this path. Refresh the index and check the mapping.";
+"No path mapping matches this file." = "No path mapping matches this file.";
+"Operation cancelled. Previous index retained." = "Operation cancelled. Previous index retained.";
+"Password (saved only as a Keychain token)" = "Password (saved only as a Keychain token)";
+"Path mappings — longest root wins, then highest priority" = "Path mappings — longest root wins, then highest priority";
+"Priority" = "Priority";
+"Refresh index" = "Refresh index";
+"SMB file path to test" = "SMB file path to test";
+"Save mapping" = "Save mapping";
+"Save server" = "Save server";
+"Saved mappings" = "Saved mappings";
+"Server address (including any /jellyfin base path)" = "Server address (including any /jellyfin base path)";
+"Server name" = "Server name";
+"Server saved. Sign in after changing its address or username." = "Server saved. Sign in after changing its address or username.";
+"Sign in" = "Sign in";
+"Signed in. Refresh the media index to enable path matching." = "Signed in. Refresh the media index to enable path matching.";
+"Test connection" = "Test connection";
+"Test path" = "Test path";
+"This NAS data format is unsupported. It has not been overwritten." = "This NAS data format is unsupported. It has not been overwritten.";
+"Use absolute paths without parent-directory components." = "Use absolute paths without parent-directory components.";
+"Username" = "Username";
+"Working…" = "Working…";
+
+"alert.window_geometry.invalid" = "Enter whole numbers for window size and position. Percentages must be between 0 and 100. For a width such as 1440, select points instead of percent.";
+"Append selected" = "Append selected";
+"Append selected videos" = "Append selected videos";
+"Audio / Subtitles" = "Audio / Subtitles";
+"Browse NAS" = "Browse NAS";
+"Cancel" = "Cancel";
+"Copy" = "Copy";
+"Default playback quality" = "Default playback quality";
+"Delete" = "Delete";
+"Import results" = "Import results";
+"Jellyfin could not provide the selected media source or quality. Try Auto, check server transcoding, or refresh the index." = "Jellyfin could not provide the selected media source or quality. Try Auto, check server transcoding, or refresh the index.";
+"Merge" = "Merge";
+"Playback cancelled" = "Playback cancelled";
+"Refresh" = "Refresh";
+"Rename" = "Rename";
+"Resolving Jellyfin media…" = "Resolving Jellyfin media…";
+"Resume Jellyfin playback position" = "Resume Jellyfin playback position";
+"Save current" = "Save current";
+"Saved playlists" = "Saved playlists";
+"Skip duplicate media" = "Skip duplicate media";
+"Up" = "Up";
+
+"Add or select a server, then sign in before testing the connection or refreshing the index." = "Add or select a server, then sign in before testing the connection or refreshing the index.";
+
+"Signing in…" = "Signing in…";
+
+"Testing connection…" = "Testing connection…";
+
+"Refreshing media index…" = "Refreshing media index…";
+
+"Testing path mapping…" = "Testing path mapping…";
+
+"Jellyfin libraries" = "Jellyfin libraries";
+
+"Indexed physical folders" = "Indexed physical folders";
+
+"Search videos" = "Search videos";
+
+"Folder / Video" = "Folder / Video";
+
+"All folders" = "All folders";
+
+"Loading…" = "Loading…";
+
+"%d items" = "%d items";
+
+" · Cached index" = " · Cached index";
+
+"Parent folders" = "Parent folders";
+
+"Back" = "Back";
+
+"Forward" = "Forward";
+
+"List view" = "List view";
+
+"Column view" = "Column view";
+
+"Append current folder" = "Append current folder";
+
+"Open a folder first." = "Open a folder first.";
+
+"Select videos or a folder to add." = "Select videos or a folder to add.";
+
+"Adding videos… Please wait or cancel the current import." = "Adding videos… Please wait or cancel the current import.";

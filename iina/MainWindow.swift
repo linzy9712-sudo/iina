@@ -47,7 +47,7 @@ class MainWindow: CommonWindow {
   }
 
   private func shouldFavorArrowKeyNavigation(for responder: NSResponder) -> Bool {
-    return responder as? NSTextView != nil
+    return responder is NSTextView || responder is NSTableView
   }
 
   override var canBecomeKey: Bool {
@@ -85,5 +85,22 @@ class MainWindowContentView: NSView {
     addTrackingArea(NSTrackingArea(rect: bounds,
       options: [.activeAlways, .enabledDuringMouseDrag, .inVisibleRect, .mouseEnteredAndExited, .mouseMoved],
       owner: controller, userInfo: ["obj": 0]))
+  }
+}
+
+/// Receives Finder drops even when the video is covered by the OSC/content views.
+final class PlayerDropHostView: NSView {
+  weak var player: PlayerCore?
+
+  override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+    player?.acceptFromPasteboard(sender) ?? []
+  }
+
+  override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+    draggingEntered(sender)
+  }
+
+  override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+    player?.openFromPasteboard(sender) ?? false
   }
 }

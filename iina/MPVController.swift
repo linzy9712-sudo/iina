@@ -385,8 +385,12 @@ class MPVController: NSObject {
     setUserOption(PK.resumeLastPosition, type: .bool, forName: MPVOption.WatchLater.resumePlayback,
                   verboseIfDefault: true)
 
-    setUserOption(.initialWindowSizePosition, type: .string, forName: MPVOption.Window.geometry,
-                  level: .verbose)
+    setUserOption(.initialWindowSizePosition, type: .other, forName: MPVOption.Window.geometry,
+                  level: .verbose) { key in
+      // Legacy preferences may contain an out-of-range percentage (e.g. 1440%).
+      // Ignore it without blocking every new player with an internal-error dialog.
+      GeometryDef.safeOption(Preference.string(for: key) ?? "")
+    }
 
     // - Codec
 
@@ -1054,6 +1058,13 @@ class MPVController: NSObject {
     return Int(asInt64)
   }
 
+  @Atomic private var suppressJellyfinLogs = false
+
+  func protectJellyfinLogs() {
+    suppressJellyfinLogs = true
+    setNode("log-file", "")
+  }
+
   // MARK: - Hooks
 
   func addHook(_ name: MPVHook, priority: Int32 = 0, hook: MPVHookValue) {
@@ -1102,6 +1113,7 @@ class MPVController: NSObject {
       }
 
     case MPV_EVENT_LOG_MESSAGE:
+      guard !suppressJellyfinLogs else { break }
       let dataOpaquePtr = OpaquePointer(event.pointee.data)
       let msg = UnsafeMutablePointer<mpv_event_log_message>(dataOpaquePtr)
       let prefix = String(cString: (msg?.pointee.prefix)!)
@@ -1142,7 +1154,7 @@ class MPVController: NSObject {
         player.info.state = .starting
         player.fileStarted(path: path)
         let url = player.info.currentURL
-        let message = player.info.isNetworkResource ? url?.absoluteString : url?.lastPathComponent
+        let message = NASQueueEntry.decode(path)?.title ?? (player.info.isNetworkResource ? url?.absoluteString : url?.lastPathComponent)
         player.sendOSD(.fileStart(message ?? "-"))
       }
 
