@@ -118,9 +118,16 @@ class Titlebar: NSView {
     removeBlackBarButton.isBordered = false
     updateRemoveBlackBarButton()
 
+    let quality = NSButton(title: "播放画质", target: self, action: #selector(showNASQuality))
+    quality.bezelStyle = .rounded
+    quality.controlSize = .small
     if useSystemTitle {
       let titlebarAccessoryViewController = NSTitlebarAccessoryViewController()
-      titlebarAccessoryViewController.view = onTopButton
+      let accessories = NSStackView(views: [quality, onTopButton])
+      accessories.orientation = .horizontal
+      accessories.spacing = 8
+      accessories.frame = NSRect(x: 0, y: 0, width: 110, height: 24)
+      titlebarAccessoryViewController.view = accessories
       titlebarAccessoryViewController.layoutAttribute = .right
       mainWindow.window!.addTitlebarAccessoryViewController(titlebarAccessoryViewController)
     } else {
@@ -191,7 +198,7 @@ class Titlebar: NSView {
       let browse = NSButton(title: NSLocalizedString("Browse NAS", comment: "NAS"), target: self, action: #selector(browseNAS))
       browse.bezelStyle = .rounded
       browse.controlSize = .small
-      let accessoryView = NSStackView(views: [browse, removeBlackBarButton, onTopButton])
+      let accessoryView = NSStackView(views: [browse, quality, removeBlackBarButton, onTopButton])
       accessoryView.translatesAutoresizingMaskIntoConstraints = false
       accessoryView.orientation = .horizontal
       accessoryView.spacing = 8
@@ -218,6 +225,8 @@ class Titlebar: NSView {
     updateShadow()
   }
   
+  @objc private func showNASQuality() { mainWindow.player.nas.showQuality() }
+
   @objc private func browseNAS() { mainWindow.player.nas.showBrowser() }
 
   required init?(coder: NSCoder) {

@@ -73,6 +73,17 @@ enum NASQuality: String, CaseIterable {
   var bitrate: Int { self == .original ? Int(Int32.max) : self == .hd720 ? 4_000_000 : self == .hd1080 ? 10_000_000 : 40_000_000 }
 }
 
+/// A manual ceiling requests transcoding so a direct stream cannot bypass the selected bitrate.
+enum NASBitrate: Int, CaseIterable {
+  case automatic = 0, mbps2 = 2, mbps4 = 4, mbps8 = 8, mbps12 = 12, mbps20 = 20, mbps40 = 40, mbps80 = 80
+  var label: String { self == .automatic ? "自动（使用画质默认值）" : "\(rawValue) Mbps" }
+  var bitsPerSecond: Int? { self == .automatic ? nil : rawValue * 1_000_000 }
+  static var preferred: NASBitrate {
+    get { NASBitrate(rawValue: UserDefaults.standard.integer(forKey: "nasBitrateMbps")) ?? .automatic }
+    set { UserDefaults.standard.set(newValue.rawValue, forKey: "nasBitrateMbps") }
+  }
+}
+
 /// Reused by Finder import and the browser. Missing or ambiguous NAS paths never fall back to SMB playback.
 enum NASImportResolver {
   static func resolve(_ paths: [String], configuration: NASConfiguration, store: NASStore) -> (entries: [NASQueueEntry], errors: [String]) {

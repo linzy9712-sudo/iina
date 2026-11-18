@@ -50,6 +50,17 @@ private final class PlaybackHTTP: URLProtocol {
     let codecs = profile["CodecProfiles"] as! [[String: Any]]
     let conditions = codecs[0]["Conditions"] as! [[String: Any]]
     precondition(conditions.contains { $0["Property"] as? String == "Height" && $0["Value"] as? String == "720" })
+    for bitrate in NASBitrate.allCases where bitrate != .automatic {
+      let capped = try await client.playback(server: server, entry: entry, token: "test-token", quality: .original,
+                                            resume: false, startTicks: 75_000_000, bitrate: bitrate)
+      precondition(capped.transcode && capped.resumeTicks == 75_000_000)
+      let body = negotiatedBodies.last!
+      precondition(body["MaxStreamingBitrate"] as? Int == bitrate.bitsPerSecond)
+      precondition((body["DeviceProfile"] as! [String: Any])["MaxStreamingBitrate"] as? Int == bitrate.bitsPerSecond)
+      precondition(body["EnableDirectPlay"] as? Bool == false)
+      precondition(body["AllowVideoStreamCopy"] as? Bool == false)
+      precondition(body["EnableTranscoding"] as? Bool == true)
+    }
     PlaybackHTTP.reply = { _ in (200, "{\"PlaySessionId\":\"session\",\"MediaSources\":[{\"Id\":\"source\",\"SupportsTranscoding\":true,\"TranscodingUrl\":\"https://untrusted.invalid/stream.m3u8\"}]}") }
     do { _ = try await client.playback(server: server, entry: entry, token: "test-token", quality: .transcode, resume: false); fatalError("Cross-origin stream accepted") }
     catch NASError.invalidResponse { }

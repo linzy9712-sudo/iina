@@ -2631,7 +2631,9 @@ class PlayerCore: NSObject {
   }
 
   func windowScaleChanged() {
-    guard mainWindow.loaded, info.state.active, !Preference.bool(for: .lockPlayerWindowSize) else { return }
+    // Explicit mpv window-scale commands (including keyboard shortcuts) remain available.
+    // Automatic file-size changes are suppressed in handleVideoSizeChange instead.
+    guard mainWindow.loaded, info.state.active else { return }
     let windowScale = mpv.getDouble(MPVOption.Window.windowScale)
     if fabs(windowScale - info.cachedWindowScale) > 10e-10 {
       mainWindow.setWindowScale(windowScale)

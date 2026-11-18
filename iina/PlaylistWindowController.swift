@@ -40,6 +40,8 @@ final class PlaylistWindowController: NSWindowController, NSWindowDelegate {
     guard videoContentView == nil, let parent = player.mainWindow.window,
           let content = parent.contentView else { return }
     let host = PlayerDropHostView(frame: content.frame)
+    // The window owns this root view’s frame; it must remain flexible during live resize.
+    host.autoresizingMask = [.width, .height]
     host.player = player
     host.registerForDraggedTypes([.iinaNASMedia, .fileURL, .nsFilenames, .nsURL, .string])
     parent.contentView = host

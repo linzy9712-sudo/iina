@@ -115,3 +115,19 @@ Runs the production navigation and column-rendering methods in an AppKit fixture
 back/forward, ancestor jumps, history branching, duplicate navigation prevention,
 ancestor columns and switching views without changing the location. It does not
 replace visual acceptance of the full application.
+
+Window sizing and bitrate regression (2026-11-18):
+
+```sh
+python3 Tests/NAS/window_scale_test.py
+```
+
+This executes the production window-scale handler with size lock enabled, checks
+that explicit scale commands still resize, and verifies feedback/idle suppression.
+The playback regression in `run.sh` checks all manual bitrate ceilings, including
+Original + an explicit ceiling, forced transcoding, and preservation of seek ticks.
+The player title bar offers “播放画质”; manual bitrate values request server-side
+transcoding. They are maximum requested bitrates, not guaranteed output rates.
+Manual acceptance: drag window edges while playing/paused, use window-scale keys,
+switch files with size lock enabled, and switch bitrate against a real Jellyfin
+server while retaining the position and selected tracks.

@@ -107,7 +107,7 @@ final class NASPlayerCoordinator {
         choices[entry.identity]?.ticks = nil
         let plan = try await client.playback(server: server, entry: entry, token: token, quality: quality,
                                             resume: UserDefaults.standard.object(forKey: "nasResume") as? Bool ?? true,
-                                            audioIndex: choice?.audio, subtitleIndex: choice?.subtitle, startTicks: choice?.ticks)
+                                            audioIndex: choice?.audio, subtitleIndex: choice?.subtitle, startTicks: choice?.ticks, bitrate: .preferred)
         let active = Session(entry: entry, server: server, token: token, plan: plan, client: client)
         negotiated = active
         try Task.checkCancellation()
@@ -190,6 +190,36 @@ final class NASPlayerCoordinator {
         self.subtitleFile = file
         self.player.loadExternalSubFile(file)
       } catch { if let self, self.session === active { self.diagnostic = "Subtitle: " + error.localizedDescription } }
+    }
+  }
+
+  func showQuality() {
+    let quality = NSPopUpButton(), bitrate = NSPopUpButton()
+    quality.addItems(withTitles: ["自动", "原画（直接播放）", "NAS 转码", "1080p", "720p"])
+    let current = NASQuality(rawValue: UserDefaults.standard.string(forKey: "nasQuality") ?? "auto") ?? .auto
+    quality.selectItem(at: NASQuality.allCases.firstIndex(of: current) ?? 0)
+    bitrate.addItems(withTitles: NASBitrate.allCases.map { $0.label })
+    bitrate.selectItem(at: NASBitrate.allCases.firstIndex(of: .preferred) ?? 0)
+    let alert = NSAlert()
+    alert.messageText = "Jellyfin 播放画质"
+    alert.informativeText = "指定码率会使用 NAS 转码；实际码率可能低于上限。应用后从当前位置继续播放，并保存为后续视频的默认值。"
+    let stack = NSStackView(views: [NSTextField(labelWithString: "画质"), quality,
+                                  NSTextField(labelWithString: "最高码率"), bitrate])
+    stack.orientation = .vertical; stack.alignment = .leading
+    stack.frame = NSRect(x: 0, y: 0, width: 340, height: 120)
+    alert.accessoryView = stack
+    alert.addButton(withTitle: "应用"); alert.addButton(withTitle: "取消")
+    guard let window = player.currentWindow else { return }
+    let active = session
+    alert.beginSheetModal(for: window) { [weak self] result in
+      guard let self, result == .alertFirstButtonReturn else { return }
+      UserDefaults.standard.set(NASQuality.allCases[quality.indexOfSelectedItem].rawValue, forKey: "nasQuality")
+      NASBitrate.preferred = NASBitrate.allCases[bitrate.indexOfSelectedItem]
+      guard let active, self.session === active else { return }
+      self.sample()
+      self.choices[active.entry.identity] = TrackChoice(audio: active.plan.audioIndex,
+                                                       subtitle: active.plan.subtitleIndex, ticks: active.ticks)
+      self.player.playFileInPlaylist(self.player.mpv.getInt(MPVProperty.playlistPos))
     }
   }
 

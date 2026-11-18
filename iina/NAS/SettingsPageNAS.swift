@@ -76,6 +76,11 @@ final class SettingsPageNAS: SettingsPage {
     quality.selectItem(at: NASQuality.allCases.firstIndex(of: NASQuality(rawValue: UserDefaults.standard.string(forKey: "nasQuality") ?? "auto") ?? .auto) ?? 0)
     quality.target = self; quality.action = #selector(qualityChanged(_:))
     field("Default playback quality", quality)
+    let bitrate = NSPopUpButton()
+    bitrate.addItems(withTitles: NASBitrate.allCases.map { $0.label })
+    bitrate.selectItem(at: NASBitrate.allCases.firstIndex(of: .preferred) ?? 0)
+    bitrate.target = self; bitrate.action = #selector(bitrateChanged(_:))
+    field("Jellyfin 转码最高码率", bitrate)
     let resume = NSButton(checkboxWithTitle: text("Resume Jellyfin playback position"), target: self, action: #selector(resumeChanged(_:)))
     resume.state = (UserDefaults.standard.object(forKey: "nasResume") as? Bool ?? true) ? .on : .off
     stack.addArrangedSubview(resume)
@@ -121,6 +126,7 @@ final class SettingsPageNAS: SettingsPage {
   }
 
   @objc private func browseNAS() { PlayerCore.active.nas.showBrowser() }
+  @objc private func bitrateChanged(_ sender: NSPopUpButton) { NASBitrate.preferred = NASBitrate.allCases[sender.indexOfSelectedItem] }
   @objc private func qualityChanged(_ sender: NSPopUpButton) { UserDefaults.standard.set(NASQuality.allCases[sender.indexOfSelectedItem].rawValue, forKey: "nasQuality") }
   @objc private func resumeChanged(_ sender: NSButton) { UserDefaults.standard.set(sender.state == .on, forKey: "nasResume") }
   @objc private func skipChanged(_ sender: NSButton) { UserDefaults.standard.set(sender.state == .on, forKey: "nasSkipDuplicates") }
