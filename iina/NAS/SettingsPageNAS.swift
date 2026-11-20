@@ -193,8 +193,8 @@ final class SettingsPageNAS: SettingsPage {
     catch { show(error) }
   }
   @discardableResult private func saveServerFields() throws -> NASServer {
-    guard var server = selectedServer, let index = configuration.servers.firstIndex(where: { $0.id == server.id }) else { throw NASError.authentication }
     let url = try JellyfinClient.serverURL(address.stringValue)
+    var server = selectedServer ?? NASServer(name: "", baseURL: url)
     let user = username.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     if server.baseURL != url || server.username != user {
       try credentials.remove(server)
@@ -202,9 +202,20 @@ final class SettingsPageNAS: SettingsPage {
     }
     server.name = name.stringValue.isEmpty ? url.host! : name.stringValue
     server.baseURL = url; server.username = user
-    var updated = configuration; updated.servers[index] = server
+    var updated = configuration
+    let index: Int
+    if let existing = updated.servers.firstIndex(where: { $0.id == server.id }) {
+      index = existing
+      updated.servers[index] = server
+    } else {
+      index = updated.servers.count
+      updated.servers.append(server)
+    }
     try persist(updated)
+    // Do not reload the form here: serverChanged() clears the password before signIn reads it.
+    if servers.numberOfItems == index { servers.addItem(withTitle: server.name) }
     servers.item(at: index)?.title = server.name
+    servers.selectItem(at: index)
     return server
   }
 

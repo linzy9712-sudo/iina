@@ -48,6 +48,7 @@ enum NASError: Error, LocalizedError {
   case invalidURL, invalidPath, noMapping, ambiguousMapping, missingMedia, ambiguousMedia
   case authentication, http(Int), transport, invalidResponse, missingPaths, noIndex, incompatibleStore, playbackUnavailable
   case keychain(Int32)
+  case signInRequired
   case transportCode(Int)
 
   var errorDescription: String? {
@@ -60,6 +61,7 @@ enum NASError: Error, LocalizedError {
     case .missingMedia: message = "No indexed media matches this path. Refresh the index and check the mapping."
     case .ambiguousMedia: message = "Multiple media items match this path. No item was selected."
     case .authentication: message = "Authentication expired or access denied. Sign in again."
+    case .signInRequired: message = "Sign in to this server before testing the connection or refreshing the index."
     case .http(let status): return String(format: NSLocalizedString("Jellyfin returned HTTP %d.", comment: "NAS error"), status)
     case .transportCode(let code):
       switch code {
