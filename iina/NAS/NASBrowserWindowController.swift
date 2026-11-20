@@ -18,6 +18,24 @@ enum NASDrop {
 /// Each column scrolls vertically itself. The outer scroll view only scrolls horizontally.
 final class NASColumnsScrollView: NSScrollView {
   private var fittingDocument = false
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    hasHorizontalScroller = true
+    hasVerticalScroller = false
+    scrollerStyle = .legacy
+    autohidesScrollers = true
+    automaticallyAdjustsContentInsets = false
+    horizontalScrollElasticity = .none
+    verticalScrollElasticity = .none
+  }
+
+  required init?(coder: NSCoder) { fatalError() }
+
+  override func wantsForwardedScrollEvents(for axis: NSEvent.GestureAxis) -> Bool {
+    return axis == .horizontal
+  }
+
   override func tile() {
     super.tile()
     guard !fittingDocument, let documentView else { return }
@@ -62,6 +80,7 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
   private let columnsScroll = NASColumnsScrollView()
   private let columnsStack = NSStackView()
   private let content = NSView()
+  private var renderedColumnPath: [String?] = []
   private var columnRows: [[Row]] = []
   private var cachedRows: [String: [Row]] = [:]
   private weak var selectedTable: NSTableView?
@@ -95,24 +114,39 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
     defer { rebuildingColumns = false }
     backButton.isEnabled = !backHistory.isEmpty; forwardButton.isEnabled = !forwardHistory.isEmpty
     listScroll.isHidden = columnsVisible; columnsScroll.isHidden = !columnsVisible
+    let locations = parents + [folder]
+    if columnsVisible, locations == renderedColumnPath,
+       let scroll = columnsStack.arrangedSubviews.last as? NSScrollView,
+       let list = scroll.documentView as? NSTableView {
+      // The request completed at the same location. Keep the views tracking the user's scroll.
+      columnRows[list.tag] = rows
+      list.reloadData()
+      return
+    }
     selectedTable = nil
     for view in columnsStack.arrangedSubviews { columnsStack.removeArrangedSubview(view); view.removeFromSuperview() }
     columnRows = []
+    renderedColumnPath = columnsVisible ? locations : []
     guard columnsVisible else { return }
-    let locations = parents + [folder]
     for (depth, parent) in locations.enumerated() {
       let values = depth == parents.count ? rows : (cachedRows[parent ?? ""] ?? [])
       columnRows.append(values)
       let list = NSTableView(); list.tag = depth
-      let column = NSTableColumn(identifier: .init("name")); column.width = 244
+      // Fit the table to its viewport so AppKit can forward swipes in either direction.
+      list.style = .fullWidth
+      list.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+      let column = NSTableColumn(identifier: .init("name"))
+      column.resizingMask = .autoresizingMask
       column.title = depth == 0 ? NSLocalizedString("All folders", comment: "NAS") : folderNames[depth - 1]
       list.addTableColumn(column); list.delegate = self; list.dataSource = self
       list.allowsMultipleSelection = true; list.target = self
       list.action = #selector(columnClicked(_:)); list.doubleAction = #selector(columnDoubleClicked(_:))
       list.setDraggingSourceOperationMask(.copy, forLocal: true)
       list.menu = table.menu?.copy() as? NSMenu
-      let scroll = NSScrollView(); scroll.documentView = list; scroll.hasVerticalScroller = true
-      scroll.frame = NSRect(x: depth * 260, y: 0, width: 260, height: Int(columnsScroll.contentSize.height))
+      let scroll = NSScrollView(frame: NSRect(x: depth * 260, y: 0, width: 260, height: Int(columnsScroll.contentSize.height)))
+      scroll.hasVerticalScroller = true
+      scroll.documentView = list
+      list.sizeLastColumnToFit()
       columnsStack.addArrangedSubview(scroll)
       scroll.widthAnchor.constraint(equalToConstant: 260).isActive = true
       scroll.heightAnchor.constraint(equalTo: columnsStack.heightAnchor).isActive = true
@@ -237,11 +271,7 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
     search.placeholderString = NSLocalizedString("Search videos", comment: "NAS"); search.target = self; search.action = #selector(refresh)
     listScroll.documentView = table; listScroll.hasVerticalScroller = true
     columnsStack.orientation = .horizontal; columnsStack.spacing = 0; columnsStack.alignment = .top
-    columnsScroll.documentView = columnsStack; columnsScroll.hasHorizontalScroller = true
-    columnsScroll.hasVerticalScroller = false
-    columnsScroll.automaticallyAdjustsContentInsets = false
-    columnsScroll.horizontalScrollElasticity = .none
-    columnsScroll.verticalScrollElasticity = .none
+    columnsScroll.documentView = columnsStack
     for scroll in [listScroll, columnsScroll] {
       content.addSubview(scroll); scroll.translatesAutoresizingMaskIntoConstraints = false
       NSLayoutConstraint.activate([scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor), scroll.topAnchor.constraint(equalTo: content.topAnchor), scroll.bottomAnchor.constraint(equalTo: content.bottomAnchor)])

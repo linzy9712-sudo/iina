@@ -12,6 +12,14 @@ def method(name):
 methods=['  private func rememberLocation()', '  private func restore(', '  @objc private func goBack()', '  @objc private func goForward()', '  @objc private func jumpToFolder(', '  private func navigate(', '  private func renderColumns()', '  private func selectedRowsForAppend()', '  private func data(for']
 scroll_type = s[s.index('final class NASColumnsScrollView:'):s.index('final class NASBrowserWindowController:')]
 code='import Cocoa\n' + scroll_type + '''
+// AppKit normally reads the rest of a gesture from WindowServer. In this fixture
+// the test itself delivers each phase synchronously to the table's responder chain.
+final class FixtureStack: NSStackView {
+ override class var isCompatibleWithResponsiveScrolling: Bool { false }
+}
+final class FixtureTable: NSTableView {
+ override class var isCompatibleWithResponsiveScrolling: Bool { false }
+}
 final class Probe: NSObject, NSTableViewDelegate, NSTableViewDataSource {
  struct Row { var title: String; var folder: String? }
  struct Location { var folder: String?; var parents: [String?]; var names: [String]; var query: String }
@@ -21,15 +29,19 @@ final class Probe: NSObject, NSTableViewDelegate, NSTableViewDataSource {
  var location: Location { Location(folder: folder, parents: parents, names: folderNames, query: search.stringValue) }
  func refresh() {}
  let backButton=NSButton(), forwardButton=NSButton()
- let listScroll=NSScrollView(), columnsScroll=NASColumnsScrollView(), columnsStack=NSStackView()
+ let listScroll=NSScrollView(), columnsScroll=NASColumnsScrollView(), columnsStack=FixtureStack()
  let content=NSView(frame:NSRect(x:0,y:0,width:700,height:300)), table=NSTableView()
  var rebuildingColumns=false, columnsVisible=true
+ var renderedColumnPath: [String?] = []
  weak var selectedTable:NSTableView?
  var columnRows:[[Row]]=[], cachedRows:[String:[Row]]=[:], rows:[Row]=[]
  @objc func columnClicked(_ sender:NSTableView) {}
  @objc func columnDoubleClicked(_ sender:NSTableView) {}
- func numberOfRows(in tableView:NSTableView)->Int { columnRows[tableView.tag].count }
-'''+ '\n'.join(method(m) for m in methods)+'''
+ func numberOfRows(in tableView:NSTableView)->Int { data(for: tableView).count }
+ func tableView(_ tableView: NSTableView, viewFor column: NSTableColumn?, row: Int) -> NSView? {
+   NSTextField(labelWithString: data(for: tableView)[row].title)
+ }
+'''+ '\n'.join(method(m) for m in methods).replace('let list = NSTableView()', 'let list = FixtureTable()')+r'''
 }
 let app=NSApplication.shared
 let p=Probe()
@@ -74,8 +86,91 @@ for style in [NSScroller.Style.legacy, .overlay] {
 print("PASS: column height fits viewport with legacy/overlay scrollbars at multiple window sizes")
 p.columnsVisible=false;p.renderColumns();precondition(p.columnsScroll.isHidden && !p.listScroll.isHidden && p.folder=="c")
 print("PASS: back/forward, root jump, branch invalidation, duplicate prevention, ancestor columns and view switching")
+
+let browser = Probe()
+let outer = browser.columnsScroll
+let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 676, height: 275),
+                      styleMask: [.borderless], backing: .buffered, defer: false)
+browser.columnsStack.orientation = .horizontal
+browser.columnsStack.spacing = 0
+browser.columnsStack.alignment = .top
+outer.documentView = browser.columnsStack
+window.contentView = outer
+window.alphaValue = 0
+window.animationBehavior = .none
+window.orderBack(nil)
+defer { window.orderOut(nil) }
+
+func trackpadScroll(over view: NSView, x: Int32, y: Int32) {
+  let point = window.convertPoint(toScreen: view.convert(NSPoint(x: view.visibleRect.midX, y: view.visibleRect.midY), to: nil))
+  for phase in [CGScrollPhase.began, .changed, .ended] {
+    let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
+                     wheel1: phase == .ended ? 0 : y, wheel2: phase == .ended ? 0 : x, wheel3: 0)!
+    cg.location = NSPoint(x: point.x, y: NSScreen.screens[0].frame.maxY - point.y)
+    cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
+    cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
+    cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+    cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: Int64(phase.rawValue))
+    view.scrollWheel(with: NSEvent(cgEvent: cg)!)
+    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.03))
+  }
+}
+
+for id in ["a", "b", "c", "d"] { browser.navigate(to: .init(title: id, folder: id)) }
+browser.rows = (0..<80).map { .init(title: "Video \($0)") }
+browser.renderColumns()
+outer.layoutSubtreeIfNeeded()
+let right = outer.documentVisibleRect.minX
+precondition(right > 500, "Opening a deep folder should reveal the last column")
+let inner = browser.columnsStack.arrangedSubviews.last! as! NSScrollView
+let leaf = inner.documentView as! NSTableView
+for style in [NSScroller.Style.legacy, .overlay] {
+  inner.scrollerStyle = style
+  inner.tile()
+  let initialX = outer.documentVisibleRect.minX, initialY = inner.documentVisibleRect.minY
+  trackpadScroll(over: leaf, x: 50, y: 0)
+  let left = outer.documentVisibleRect.minX
+  precondition(left < initialX - 5 && inner.documentVisibleRect.minY == initialY, "Swipe left over video rows")
+  trackpadScroll(over: leaf, x: -20, y: 0)
+  precondition(outer.documentVisibleRect.minX > left + 5, "Swipe right over video rows")
+  let beforeVertical = outer.documentVisibleRect.minX
+  trackpadScroll(over: leaf, x: 0, y: -30)
+  precondition(inner.documentVisibleRect.minY > initialY + 5 && outer.documentVisibleRect.minX == beforeVertical,
+               "Vertical scrolling should stay in the column")
+}
+let visibleX = outer.documentVisibleRect.minX
+browser.rows.append(.init(title: "Later result"))
+browser.renderColumns()
+precondition(outer.documentVisibleRect.minX == visibleX && leaf.numberOfRows == 81,
+             "Loading results should update the leaf without moving the user")
+let bar = outer.horizontalScroller!
+precondition(outer.scrollerStyle == .legacy && !bar.isHidden && bar.isEnabled && bar.knobProportion < 1,
+             "Overflow needs a visible bottom scrollbar")
+func dragThumb(by distance: CGFloat) {
+  let knob = bar.rect(for: .knob)
+  let center = NSPoint(x: knob.midX, y: knob.midY)
+  precondition(outer.hitTest(bar.convert(center, to: outer.superview)) === bar, "Thumb must receive mouse hits")
+  let start = bar.convert(center, to: nil)
+  func mouse(_ type: NSEvent.EventType, x: CGFloat) -> NSEvent {
+    NSEvent.mouseEvent(with: type, location: NSPoint(x: x, y: start.y), modifierFlags: [],
+                       timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                       context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)!
+  }
+  NSApp.postEvent(mouse(.leftMouseDragged, x: start.x + distance), atStart: false)
+  NSApp.postEvent(mouse(.leftMouseUp, x: start.x + distance), atStart: false)
+  bar.mouseDown(with: mouse(.leftMouseDown, x: start.x))
+}
+dragThumb(by: -90)
+let afterDrag = outer.documentVisibleRect.minX
+precondition(afterDrag < visibleX - 10, "Dragging the thumb left should reveal earlier folders")
+dragThumb(by: 45)
+precondition(outer.documentVisibleRect.minX > afterDrag + 10, "Dragging the thumb right should reveal later folders")
+browser.navigate(to: .init(title: "e", folder: "e"))
+browser.renderColumns()
+precondition(outer.documentVisibleRect.minX > right, "New navigation should still reveal the new folder")
+print("PASS: trackpad swipes over rows in both directions, vertical scrolling, loading position and bottom scrollbar")
 '''
 with tempfile.TemporaryDirectory(prefix='iina-navigation-') as directory:
  script=Path(directory)/'NavigationRegression.swift'
  script.write_text(code)
- subprocess.run(['swift',str(script)],check=True)
+ subprocess.run(['swift',str(script)],check=True,timeout=45)
