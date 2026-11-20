@@ -9,8 +9,11 @@ def method(name):
   if s[i]=='}':level-=1
   i+=1
  return s[start:i].replace('private func','func')
-methods=['  private func rememberLocation()', '  private func restore(', '  @objc private func goBack()', '  @objc private func goForward()', '  @objc private func jumpToFolder(', '  private func navigate(', '  private func renderColumns()', '  private func selectedRowsForAppend()', '  private func data(for']
+methods=['  private func rememberLocation()', '  private func restore(', '  @objc private func goBack()', '  @objc private func goForward()', '  @objc private func jumpToFolder(', '  @objc private func columnClicked(', '  private func navigate(', '  private func renderColumns()', '  private func selectedRowsForAppend()', '  private func data(for']
+methods += ['  private func column(for', '  private func addColumn(', '  private func removeColumns(', '  private func updateColumnRows(',
+            '  private func showRowsWhileLoading()', '  @objc private func up()', '  @objc private func resetFolder()']
 scroll_type = s[s.index('final class NASColumnsScrollView:'):s.index('final class NASBrowserWindowController:')]
+column_types = s[s.index('  private struct Row:'):s.index('  private unowned let player:')].replace('private struct', 'struct')
 code='import Cocoa\n' + scroll_type + '''
 // AppKit normally reads the rest of a gesture from WindowServer. In this fixture
 // the test itself delivers each phase synchronously to the table's responder chain.
@@ -19,23 +22,29 @@ final class FixtureStack: NSStackView {
 }
 final class FixtureTable: NSTableView {
  override class var isCompatibleWithResponsiveScrolling: Bool { false }
+ var clickedFolderRow: Int?
+ override var clickedRow: Int { clickedFolderRow ?? super.clickedRow }
+ private(set) var reloads = 0
+ override func reloadData() { reloads += 1; super.reloadData() }
 }
+struct NASQueueEntry { let itemID: String?; let sourceID: String?; var title: String? }
 final class Probe: NSObject, NSTableViewDelegate, NSTableViewDataSource {
- struct Row { var title: String; var folder: String? }
+''' + column_types + '''
  struct Location { var folder: String?; var parents: [String?]; var names: [String]; var query: String }
  var folder: String?; var parents: [String?] = []; var folderNames: [String] = []
  let search = NSSearchField()
  var backHistory: [Location] = [], forwardHistory: [Location] = []
  var location: Location { Location(folder: folder, parents: parents, names: folderNames, query: search.stringValue) }
- func refresh() {}
+ var simulateLoading = false
+ func refresh() { if simulateLoading { showRowsWhileLoading() } }
+ func cancelImport() {}
  let backButton=NSButton(), forwardButton=NSButton()
  let listScroll=NSScrollView(), columnsScroll=NASColumnsScrollView(), columnsStack=FixtureStack()
  let content=NSView(frame:NSRect(x:0,y:0,width:700,height:300)), table=NSTableView()
  var rebuildingColumns=false, columnsVisible=true
- var renderedColumnPath: [String?] = []
+ var columns: [Column] = []
  weak var selectedTable:NSTableView?
- var columnRows:[[Row]]=[], cachedRows:[String:[Row]]=[:], rows:[Row]=[]
- @objc func columnClicked(_ sender:NSTableView) {}
+ var cachedRows:[String:[Row]]=[:], rows:[Row]=[]
  @objc func columnDoubleClicked(_ sender:NSTableView) {}
  func numberOfRows(in tableView:NSTableView)->Int { data(for: tableView).count }
  func tableView(_ tableView: NSTableView, viewFor column: NSTableColumn?, row: Int) -> NSView? {
@@ -61,11 +70,12 @@ p.columnsScroll.documentView = p.columnsStack
 p.columnsScroll.hasHorizontalScroller = true
 p.columnsScroll.setFrameSize(NSSize(width:700,height:300))
 p.renderColumns()
-precondition(p.columnRows.count==3 && p.columnsStack.arrangedSubviews.count==3)
-precondition(p.columnRows[0][0].folder=="a" && p.columnRows[1][0].folder=="c" && p.columnRows[2][0].title=="movie")
+precondition(p.columns.count==3 && p.columnsStack.arrangedSubviews.count==3)
+precondition(p.columns[0].rows[0].folder=="a" && p.columns[1].rows[0].folder=="c" && p.columns[2].rows[0].title=="movie")
 var queuedFolders=p.selectedRowsForAppend().compactMap(\.folder)
 precondition(queuedFolders == ["c"])
 p.cachedRows["c"]=[.init(title:"D",folder:"d")]
+p.rows=p.cachedRows["c"]!;p.renderColumns()
 p.navigate(to:.init(title:"D",folder:"d"));p.rows=[];p.renderColumns()
 queuedFolders += p.selectedRowsForAppend().compactMap(\.folder)
 precondition(queuedFolders == ["c","d"])
@@ -169,6 +179,75 @@ browser.navigate(to: .init(title: "e", folder: "e"))
 browser.renderColumns()
 precondition(outer.documentVisibleRect.minX > right, "New navigation should still reveal the new folder")
 print("PASS: trackpad swipes over rows in both directions, vertical scrolling, loading position and bottom scrollbar")
+
+// Scroll to a folder far below the first screen, then open it just as a single click does.
+browser.simulateLoading = true
+func showFolderRows(_ values: [Probe.Row]) {
+  browser.cachedRows[browser.folder ?? ""] = values
+  browser.rows = values
+  browser.renderColumns()
+  outer.layoutSubtreeIfNeeded()
+}
+func clickFolder(_ row: Int, in list: FixtureTable) {
+  list.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+  list.clickedFolderRow = row
+  browser.columnClicked(list)
+  outer.layoutSubtreeIfNeeded()
+}
+func scrollToFolder(_ row: Int, in list: FixtureTable) -> CGFloat {
+  list.scrollRowToVisible(row)
+  let offset = list.enclosingScrollView!.documentVisibleRect.minY
+  precondition(offset > 500 && list.visibleRect.intersects(list.rect(ofRow: row)))
+  return offset
+}
+let folders = (0..<120).map { Probe.Row(title: "Folder \($0)", folder: "parent-\($0)") }
+showFolderRows(folders)
+let parentScroll = browser.columnsStack.arrangedSubviews.last! as! NSScrollView
+let parentList = parentScroll.documentView as! FixtureTable
+let parentDepth = parentList.tag
+let parentY = scrollToFolder(90, in: parentList)
+let parentReloads = parentList.reloads
+clickFolder(90, in: parentList)
+func checkParent(_ row: Int) {
+  let visible = browser.columnsStack.arrangedSubviews[parentDepth] as! NSScrollView
+  precondition(abs(visible.documentVisibleRect.minY - parentY) < 1, "Opening a child reset the parent scroll position")
+  precondition(visible === parentScroll && parentList.selectedRow == row, "Keep the parent table and folder selection")
+}
+checkParent(90)
+let subfolders = (0..<120).map { Probe.Row(title: "Subfolder \($0)", folder: "child-\($0)") }
+showFolderRows(subfolders)
+let childScroll = browser.columnsStack.arrangedSubviews.last! as! NSScrollView
+let childList = childScroll.documentView as! FixtureTable
+let childY = scrollToFolder(76, in: childList)
+clickFolder(76, in: childList)
+var video = NASQueueEntry(itemID: "video", sourceID: "main", title: "Original title")
+showFolderRows([.init(title: "video.mkv", entry: video)])
+let videoList = browser.columns.last!.table as! FixtureTable
+let videoReloads = videoList.reloads
+video.title = "Updated title"
+showFolderRows([.init(title: "video.mkv", entry: video)])
+precondition(browser.data(for: videoList).first?.entry?.title == "Updated title" && videoList.reloads == videoReloads,
+             "Refresh playback metadata when the displayed filenames are unchanged")
+checkParent(90)
+precondition(browser.columnsStack.arrangedSubviews[childList.tag] === childScroll &&
+             abs(childScroll.documentVisibleRect.minY - childY) < 1, "Keep both ancestor viewports after loading")
+clickFolder(89, in: parentList)
+checkParent(89)
+precondition(browser.folder == "parent-89" && browser.columns.last?.rows.isEmpty == true &&
+             browser.selectedRowsForAppend().compactMap(\.folder) == ["parent-89"], "Replace descendants on branch change")
+precondition(parentList.reloads == parentReloads, "Child navigation must not reload the parent list")
+browser.up()
+checkParent(89)
+precondition(parentList.numberOfRows == folders.count, "Show the retained parent's rows while revalidating")
+showFolderRows([.init(title: "Earlier folder", folder: "parent-new")] + folders)
+checkParent(90)
+precondition(browser.selectedRowsForAppend().compactMap(\.folder) == ["parent-89"], "Keep the folder selected by identity after insertion")
+browser.goBack()
+checkParent(90)
+browser.resetFolder()
+precondition(browser.columns.count == 1 && browser.columns[0].rows.isEmpty && browser.data(for: parentList).isEmpty,
+             "A server or library-mode change must discard the old columns and their rows")
+print("PASS: deeply scrolled parents, sibling navigation, return during loading, selection and server reset")
 '''
 with tempfile.TemporaryDirectory(prefix='iina-navigation-') as directory:
  script=Path(directory)/'NavigationRegression.swift'

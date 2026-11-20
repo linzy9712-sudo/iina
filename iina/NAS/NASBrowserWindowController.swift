@@ -50,10 +50,25 @@ final class NASColumnsScrollView: NSScrollView {
 }
 
 final class NASBrowserWindowController: NSWindowController, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate {
-  private struct Row {
+  private struct Row: Equatable {
     var title: String
     var folder: String?
     var entry: NASQueueEntry?
+
+    enum ID: Hashable { case folder(String), video(String, String?) }
+    var id: ID? {
+      if let folder { return .folder(folder) }
+      if let itemID = entry?.itemID { return .video(itemID, entry?.sourceID) }
+      return nil
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id && lhs.title == rhs.title }
+  }
+  private struct Column {
+    let folder: String?
+    let scroll: NSScrollView
+    let table: NSTableView
+    var rows: [Row]
   }
   private unowned let player: PlayerCore
   private let servers = NSPopUpButton()
@@ -80,8 +95,7 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
   private let columnsScroll = NASColumnsScrollView()
   private let columnsStack = NSStackView()
   private let content = NSView()
-  private var renderedColumnPath: [String?] = []
-  private var columnRows: [[Row]] = []
+  private var columns: [Column] = []
   private var cachedRows: [String: [Row]] = [:]
   private weak var selectedTable: NSTableView?
   private var rebuildingColumns = false
@@ -106,70 +120,109 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
     UserDefaults.standard.set(viewStyle.selectedSegment, forKey: "nasBrowserViewStyle")
     renderColumns()
   }
-  private func data(for tableView: NSTableView) -> [Row] {
-    tableView === table ? rows : (columnRows.indices.contains(tableView.tag) ? columnRows[tableView.tag] : [])
+  private func column(for tableView: NSTableView) -> Column? {
+    let depth = tableView.tag
+    guard columns.indices.contains(depth), columns[depth].table === tableView else { return nil }
+    return columns[depth]
   }
+  private func data(for tableView: NSTableView) -> [Row] {
+    tableView === table ? rows : column(for: tableView)?.rows ?? []
+  }
+
+  private func removeColumns(from depth: Int) {
+    while columns.count > depth {
+      let removed = columns.removeLast()
+      columnsStack.removeArrangedSubview(removed.scroll)
+      removed.scroll.removeFromSuperview()
+    }
+  }
+
+  private func addColumn(for location: String?, rows values: [Row]) {
+    let depth = columns.count
+    let list = NSTableView(); list.tag = depth
+    // Fit the table to its viewport so AppKit can forward swipes in either direction.
+    list.style = .fullWidth
+    list.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+    let name = NSTableColumn(identifier: .init("name"))
+    name.resizingMask = .autoresizingMask
+    name.title = depth == 0 ? NSLocalizedString("All folders", comment: "NAS") : folderNames[depth - 1]
+    let scroll = NSScrollView(frame: NSRect(x: depth * 260, y: 0, width: 260, height: Int(columnsScroll.contentSize.height)))
+    columns.append(Column(folder: location, scroll: scroll, table: list, rows: values))
+    list.addTableColumn(name); list.delegate = self; list.dataSource = self
+    list.allowsMultipleSelection = true; list.target = self
+    list.action = #selector(columnClicked(_:)); list.doubleAction = #selector(columnDoubleClicked(_:))
+    list.setDraggingSourceOperationMask(.copy, forLocal: true)
+    list.menu = table.menu?.copy() as? NSMenu
+    scroll.hasVerticalScroller = true
+    scroll.documentView = list
+    list.sizeLastColumnToFit()
+    columnsStack.addArrangedSubview(scroll)
+    scroll.widthAnchor.constraint(equalToConstant: 260).isActive = true
+    scroll.heightAnchor.constraint(equalTo: columnsStack.heightAnchor).isActive = true
+  }
+
+  private func updateColumnRows(at depth: Int) {
+    let column = columns[depth]
+    columns[depth].rows = rows
+    guard column.rows != rows else { return }
+    let list = column.table
+    let selected = Set(list.selectedRowIndexes.compactMap { column.rows.indices.contains($0) ? column.rows[$0].id : nil })
+    list.reloadData()
+    if !selected.isEmpty {
+      let indexes = IndexSet(rows.indices.filter { rows[$0].id.map(selected.contains) == true })
+      if indexes != list.selectedRowIndexes { list.selectRowIndexes(indexes, byExtendingSelection: false) }
+    }
+  }
+
   private func renderColumns() {
     rebuildingColumns = true
     defer { rebuildingColumns = false }
     backButton.isEnabled = !backHistory.isEmpty; forwardButton.isEnabled = !forwardHistory.isEmpty
     listScroll.isHidden = columnsVisible; columnsScroll.isHidden = !columnsVisible
-    let locations = parents + [folder]
-    if columnsVisible, locations == renderedColumnPath,
-       let scroll = columnsStack.arrangedSubviews.last as? NSScrollView,
-       let list = scroll.documentView as? NSTableView {
-      // The request completed at the same location. Keep the views tracking the user's scroll.
-      columnRows[list.tag] = rows
-      list.reloadData()
+    let locations = columnsVisible ? parents + [folder] : []
+    let shared = zip(columns, locations).prefix { $0.0.folder == $0.1 }.count
+    if shared == locations.count && shared == columns.count {
+      if shared > 0 { updateColumnRows(at: shared - 1) }
       return
     }
+
+    // Keep the common ancestors in the window, including their scroll and selection state.
+    removeColumns(from: shared)
     selectedTable = nil
-    for view in columnsStack.arrangedSubviews { columnsStack.removeArrangedSubview(view); view.removeFromSuperview() }
-    columnRows = []
-    renderedColumnPath = columnsVisible ? locations : []
-    guard columnsVisible else { return }
-    for (depth, parent) in locations.enumerated() {
-      let values = depth == parents.count ? rows : (cachedRows[parent ?? ""] ?? [])
-      columnRows.append(values)
-      let list = NSTableView(); list.tag = depth
-      // Fit the table to its viewport so AppKit can forward swipes in either direction.
-      list.style = .fullWidth
-      list.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-      let column = NSTableColumn(identifier: .init("name"))
-      column.resizingMask = .autoresizingMask
-      column.title = depth == 0 ? NSLocalizedString("All folders", comment: "NAS") : folderNames[depth - 1]
-      list.addTableColumn(column); list.delegate = self; list.dataSource = self
-      list.allowsMultipleSelection = true; list.target = self
-      list.action = #selector(columnClicked(_:)); list.doubleAction = #selector(columnDoubleClicked(_:))
-      list.setDraggingSourceOperationMask(.copy, forLocal: true)
-      list.menu = table.menu?.copy() as? NSMenu
-      let scroll = NSScrollView(frame: NSRect(x: depth * 260, y: 0, width: 260, height: Int(columnsScroll.contentSize.height)))
-      scroll.hasVerticalScroller = true
-      scroll.documentView = list
-      list.sizeLastColumnToFit()
-      columnsStack.addArrangedSubview(scroll)
-      scroll.widthAnchor.constraint(equalToConstant: 260).isActive = true
-      scroll.heightAnchor.constraint(equalTo: columnsStack.heightAnchor).isActive = true
-      if depth < parents.count {
-        let next = depth + 1 < parents.count ? parents[depth + 1] : folder
-        if let index = values.firstIndex(where: { $0.folder == next }) {
-          list.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
-          // Navigation rebuilds every table. Keep the deepest selected folder as the append source.
-          if depth == parents.count - 1 { selectedTable = list }
-        }
+    guard let leaf = locations.indices.last else { return }
+    for depth in shared..<locations.count {
+      let location = locations[depth]
+      addColumn(for: location, rows: depth == leaf ? rows : cachedRows[location ?? ""] ?? [])
+    }
+    if shared == locations.count { updateColumnRows(at: leaf) }
+
+    // Only the parent at the branch point and newly created parents need a new path selection.
+    for depth in max(0, shared - 1)..<leaf {
+      let column = columns[depth]
+      let next = locations[depth + 1]
+      let row = column.rows.firstIndex { $0.folder == next }
+      let indexes = row.map(IndexSet.init(integer:)) ?? []
+      if column.table.selectedRowIndexes != indexes {
+        column.table.selectRowIndexes(indexes, byExtendingSelection: false)
       }
+    }
+    if columns[leaf].table.selectedRow >= 0 {
+      selectedTable = columns[leaf].table
+    } else if leaf > 0 {
+      selectedTable = columns[leaf - 1].table
     }
     columnsStack.setFrameSize(NSSize(width: CGFloat(locations.count) * 260, height: columnsScroll.contentSize.height))
     columnsScroll.contentView.scroll(to: NSPoint(x: max(0, columnsStack.frame.width - columnsScroll.contentSize.width), y: 0))
     columnsScroll.reflectScrolledClipView(columnsScroll.contentView)
   }
   func tableViewSelectionDidChange(_ notification: Notification) {
-    guard !rebuildingColumns, let table = notification.object as? NSTableView else { return }
+    guard !rebuildingColumns, let table = notification.object as? NSTableView, column(for: table) != nil else { return }
     selectedTable = table
   }
   @objc private func columnClicked(_ sender: NSTableView) {
+    guard let column = column(for: sender) else { return }
     selectedTable = sender
-    let values = data(for: sender)
+    let values = column.rows
     guard values.indices.contains(sender.clickedRow), sender.selectedRowIndexes.count == 1,
           !NSEvent.modifierFlags.contains(.command), !NSEvent.modifierFlags.contains(.shift),
           let next = values[sender.clickedRow].folder else { return }
@@ -342,14 +395,33 @@ final class NASBrowserWindowController: NSWindowController, NSTableViewDataSourc
     if alert.informativeText.isEmpty { alert.informativeText = "No import errors." }
     if let window { alert.beginSheetModal(for: window) }
   }
-  @objc private func resetFolder() { cancelImport(); cachedRows.removeAll(); backHistory.removeAll(); forwardHistory.removeAll(); folder = nil; parents = []; folderNames = []; search.stringValue = ""; refresh() }
+  @objc private func resetFolder() {
+    cancelImport()
+    removeColumns(from: 0)
+    selectedTable = nil
+    cachedRows.removeAll()
+    backHistory.removeAll(); forwardHistory.removeAll()
+    folder = nil; parents = []; folderNames = []; search.stringValue = ""
+    refresh()
+  }
   @objc private func up() { guard !parents.isEmpty else { return }; rememberLocation(); folder = parents.removeLast(); folderNames.removeLast(); search.stringValue = ""; refresh() }
+  private func showRowsWhileLoading() {
+    // Returning to an already visible parent must not temporarily empty its list.
+    let depth = parents.count
+    if columnsVisible, columns.indices.contains(depth), columns[depth].folder == folder {
+      rows = columns[depth].rows
+    } else {
+      rows = []
+    }
+    table.reloadData()
+    renderColumns()
+  }
   @objc private func refresh() {
     updateBreadcrumbs()
     task?.cancel(); ticket = UUID(); let stamp = ticket
-    guard let server else { status.stringValue = "Add and sign in to a server in Settings → NAS / Jellyfin."; return }
     let physical = mode.indexOfSelectedItem == 1, folder = self.folder, query = search.stringValue
-    rows = []; table.reloadData(); renderColumns() // Old rows must not accept a second click during navigation.
+    showRowsWhileLoading()
+    guard let server else { status.stringValue = "Add and sign in to a server in Settings → NAS / Jellyfin."; return }
     status.stringValue = NSLocalizedString("Loading…", comment: "NAS")
     task = Task { @MainActor in
       do {
