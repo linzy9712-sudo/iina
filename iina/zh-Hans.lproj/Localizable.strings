@@ -1139,3 +1139,5 @@
 "Select videos or a folder to add." = "请选择要添加的视频或文件夹。";
 
 "Adding videos… Please wait or cancel the current import." = "正在添加视频，请等待或取消当前导入。";
+
+"Sign in to this server before testing the connection or refreshing the index." = "请先登录此服务器，再测试连接或刷新索引。";

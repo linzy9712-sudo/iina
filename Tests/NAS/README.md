@@ -14,6 +14,17 @@ Automated coverage:
   one idle-player open, and cancellation suppressing completion.
 - Invalid persisted geometry fallback and validation of new geometry preferences.
 
+First-server settings regression (requires a graphical macOS session):
+
+```sh
+python3 Tests/NAS/server_setup_test.py
+```
+
+Exercises the production form-save method with isolated controls: creating the
+first server directly from entered fields, preserving the password for sign-in,
+repeated saves without duplicate servers, renaming, address changes invalidating
+authentication, invalid addresses, and a distinct error for servers not signed in.
+
 Build on macOS with initialized Xcode and the project's existing binary dependencies:
 
 ```sh
